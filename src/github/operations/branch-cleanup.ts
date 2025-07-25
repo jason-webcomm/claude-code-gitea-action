@@ -1,5 +1,5 @@
 import type { Octokits } from "../api/client";
-import { getServerUrl } from "../api/config";
+import { getServerUrl, isGiteaInstance } from "../api/config";
 import { $ } from "bun";
 
 export async function checkAndCommitOrDeleteBranch(
@@ -120,12 +120,27 @@ export async function checkAndCommitOrDeleteBranch(
   // Delete the branch if it has no commits
   if (shouldDeleteBranch && claudeBranch) {
     try {
-      // Use repos.deleteBranch for branch deletion (compatible with both GitHub and Gitea)
-      await octokit.rest.repos.deleteBranch({
-        owner,
-        repo,
-        branch: claudeBranch,
-      });
+      if (isGiteaInstance()) {
+        // Gitea uses the branches API for deletion
+        const response = await fetch(`${process.env.GITEA_API_URL}/repos/${owner}/${repo}/branches/${encodeURIComponent(claudeBranch)}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to delete branch: ${response.status} ${response.statusText}`);
+        }
+      } else {
+        // GitHub uses git refs API for deletion
+        await octokit.rest.git.deleteRef({
+          owner,
+          repo,
+          ref: `heads/${claudeBranch}`,
+        });
+      }
       console.log(`✅ Deleted empty branch: ${claudeBranch}`);
     } catch (deleteError) {
       console.error(`Failed to delete branch ${claudeBranch}:`, deleteError);
