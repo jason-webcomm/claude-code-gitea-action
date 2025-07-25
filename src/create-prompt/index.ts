@@ -61,7 +61,6 @@ export function buildAllowedToolsString(
     "mcp__local_git_ops__git_status"
   );
 
-  // When not using commit signing, add specific Bash git commands only
   baseTools.push(
     "Bash(git add:*)",
     "Bash(git commit:*)",
@@ -637,7 +636,16 @@ ${sanitizeContent(context.directPrompt)}
     : ""
 }
 ${`<comment_tool_info>
-IMPORTANT: You have been provided with the mcp__gitea_api__update_issue_comment tool to update your comment for this task.`}
+IMPORTANT: You have been provided with the mcp__gitea_api__update_issue_comment tool to update your comment for this task.
+
+Tool usage example for mcp__gitea_api__update_issue_comment:
+{
+  "comment_id": ${context.claudeCommentId},
+  "body": "Your comment text here"
+}
+
+Your comment ID is: ${context.claudeCommentId}
+Only the body parameter needs to be changed - always use comment_id: ${context.claudeCommentId} to update your initial comment.`}
 
 Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
 
