@@ -41,9 +41,6 @@ export function buildAllowedToolsString(
 ): string {
   let baseTools = [...BASE_ALLOWED_TOOLS];
 
-  // Always include the comment update tool from the comment server
-  baseTools.push("mcp__github_comment__update_claude_comment");
-
   // Add Gitea MCP tools for Gitea instances
   baseTools.push(
     "mcp__gitea_api__get_issue",
@@ -54,36 +51,28 @@ export function buildAllowedToolsString(
     "mcp__gitea_api__get_pull_request_files",
     "mcp__gitea_api__get_file_contents",
     "mcp__gitea_api__list_branches",
-    // "mcp__gitea_api__create_branch",
-    // "mcp__local_git_ops__create_branch",
-    // "mcp__local_git_ops__checkout_branch",
-    // "mcp__local_git_ops__commit_files",
-    // "mcp__local_git_ops__push_branch",
+    "mcp__gitea_api__create_branch",
+    "mcp__local_git_ops__create_branch",
+    "mcp__local_git_ops__checkout_branch",
+    "mcp__local_git_ops__commit_files",
+    "mcp__local_git_ops__push_branch",
     "mcp__local_git_ops__create_pull_request",
-    // "mcp__local_git_ops__delete_files",
+    "mcp__local_git_ops__delete_files",
     "mcp__local_git_ops__git_status"
   );
 
-  // Add commit signing tools if enabled
-  if (useCommitSigning) {
-    baseTools.push(
-      "mcp__github_file_ops__commit_files",
-      "mcp__github_file_ops__delete_files",
-    );
-  } else {
-    // When not using commit signing, add specific Bash git commands only
-    baseTools.push(
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git rm:*)",
-      "Bash(git config user.name:*)",
-      "Bash(git config user.email:*)",
-    );
-  }
+  // When not using commit signing, add specific Bash git commands only
+  baseTools.push(
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git status:*)",
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git rm:*)",
+    "Bash(git config user.name:*)",
+    "Bash(git config user.email:*)",
+  );
 
   // Add GitHub Actions MCP tools if enabled
   if (includeActionsTools) {
@@ -439,15 +428,15 @@ function getCommitInstructions(
   if (useCommitSigning) {
     if (eventData.isPR && !eventData.claudeBranch) {
       return `
-      - Push directly using mcp__github_file_ops__commit_files to the existing branch (works for both new and existing files).
-      - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
+      - Push directly using mcp__local_git_ops__commit_files to the existing branch (works for both new and existing files).
+      - Use mcp__local_git_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
       - When pushing changes with this tool and the trigger user is not "Unknown", include a Co-authored-by trailer in the commit message.
       - Use: "${coAuthorLine}"`;
     } else {
       return `
       - You are already on the correct branch (${eventData.claudeBranch || "the PR branch"}). Do not create a new branch.
-      - Push changes directly to the current branch using mcp__github_file_ops__commit_files (works for both new and existing files)
-      - Use mcp__github_file_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
+      - Push changes directly to the current branch using mcp__local_git_ops__commit_files (works for both new and existing files)
+      - Use mcp__local_git_ops__commit_files to commit files atomically in a single commit (supports single or multiple files).
       - When pushing changes and the trigger user is not "Unknown", include a Co-authored-by trailer in the commit message.
       - Use: "${coAuthorLine}"`;
     }
@@ -585,7 +574,7 @@ export function generatePrompt(
     ? `
 
 <images_info>
-Images have been downloaded from GitHub comments and saved to disk. Their file paths are included in the formatted comments and body above. You can use the Read tool to view these images.
+Images have been downloaded from Gitea comments and saved to disk. Their file paths are included in the formatted comments and body above. You can use the Read tool to view these images.
 </images_info>`
     : "";
 
@@ -593,7 +582,7 @@ Images have been downloaded from GitHub comments and saved to disk. Their file p
     ? formatBody(contextData.body, imageUrlMap)
     : "No description provided";
 
-  let promptContent = `You are Claude, an AI assistant designed to help with GitHub issues and pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
+  let promptContent = `You are Claude, an AI assistant designed to help with Gitea issues and pull requests. Think carefully as you analyze the context and respond appropriately. Here's the context for your current task:
 
 <formatted_context>
 ${formattedContext}
@@ -648,28 +637,21 @@ ${sanitizeContent(context.directPrompt)}
     : ""
 }
 ${`<comment_tool_info>
-IMPORTANT: You have been provided with the mcp__github_comment__update_claude_comment tool to update your comment. This tool automatically handles both issue and PR comments.
-
-Tool usage example for mcp__github_comment__update_claude_comment:
-{
-  "body": "Your comment text here"
-}
-Only the body parameter is required - the tool automatically knows which comment to update.
-</comment_tool_info>`}
+IMPORTANT: You have been provided with the mcp__gitea_api__update_issue_comment tool to update your comment for this task.`}
 
 Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
 
 IMPORTANT CLARIFICATIONS:
 - When asked to "review" code, read the code and provide review feedback (do not implement changes unless explicitly asked)${eventData.isPR ? "\n- For PR reviews: Your review will be posted when you update the comment. Focus on providing comprehensive review feedback." : ""}
 - Your console outputs and tool results are NOT visible to the user
-- ALL communication happens through your GitHub comment - that's how users see your feedback, answers, and progress. your normal responses are not seen.
+- ALL communication happens through your Gitea comment - that's how users see your feedback, answers, and progress. your normal responses are not seen.
 
 Follow these steps:
 
 1. Create a Todo List:
-   - Use your GitHub comment to maintain a detailed task list based on the request.
+   - Use your Gitea comment to maintain a detailed task list based on the request.
    - Format todos as a checklist (- [ ] for incomplete, - [x] for complete).
-   - Update the comment using mcp__github_comment__update_claude_comment with each task completion.
+   - Update the comment using mcp__gitea_api__update_issue_comment with each task completion.
 
 2. Gather Context:
    - Analyze the pre-fetched data provided above.
@@ -700,11 +682,11 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
         - Look for bugs, security issues, performance problems, and other issues
         - Suggest improvements for readability and maintainability
         - Check for best practices and coding standards
-        - Reference specific code sections with file paths and line numbers${eventData.isPR ? `\n      - AFTER reading files and analyzing code, you MUST call mcp__github_comment__update_claude_comment to post your review` : ""}
+        - Reference specific code sections with file paths and line numbers${eventData.isPR ? `\n      - AFTER reading files and analyzing code, you MUST call mcp__gitea_api__update_issue_comment to post your review` : ""}
       - Formulate a concise, technical, and helpful response based on the context.
       - Reference specific code with inline formatting or code blocks.
       - Include relevant file paths and line numbers when applicable.
-      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__github_comment__update_claude_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the GitHub comment using mcp__github_comment__update_claude_comment.`}
+      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__gitea_api__update_issue_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the Gitea comment using mcp__gitea_api__update_issue_comment.`}
 
    B. For Straightforward Changes:
       - Use file system tools to make the change locally.
@@ -739,25 +721,22 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
       - Or explain why it's too complex: mark todo as completed in checklist with explanation.
 
 5. Final Update:
-   - Always update the GitHub comment to reflect the current todo state.
+   - Always update the Gitea comment to reflect the current todo state.
    - When all todos are completed, remove the spinner and add a brief summary of what was accomplished, and what was not done.
    - Note: If you see previous Claude comments with headers like "**Claude finished @user's task**" followed by "---", do not include this in your comment. The system adds this automatically.
-   - If you changed any files locally, you must update them in the remote branch via ${useCommitSigning ? "mcp__github_file_ops__commit_files" : "git commands (add, commit, push)"} before saying that you're done.
+   - If you changed any files locally, you must update them in the remote branch via ${useCommitSigning ? "mcp__local_git_ops__commit_files" : "git commands (add, commit, push)"} before saying that you're done.
    ${eventData.claudeBranch ? `- If you created anything in your branch, your comment must include the PR URL with prefilled title and body mentioned above.` : ""}
 
 Important Notes:
-- All communication must happen through GitHub PR comments.
-- Never create new comments. Only update the existing comment using mcp__github_comment__update_claude_comment.
-- This includes ALL responses: code reviews, answers to questions, progress updates, and final results.${eventData.isPR ? `\n- PR CRITICAL: After reading files and forming your response, you MUST post it by calling mcp__github_comment__update_claude_comment. Do NOT just respond with a normal response, the user will not see it.` : ""}
+- All communication must happen through Gitea PR comments.
+- Never create new comments. Only update the existing comment using mcp__gitea_api__update_issue_comment.
+- This includes ALL responses: code reviews, answers to questions, progress updates, and final results.${eventData.isPR ? `\n- PR CRITICAL: After reading files and forming your response, you MUST post it by calling mcp__gitea_api__update_issue_comment. Do NOT just respond with a normal response, the user will not see it.` : ""}
 - You communicate exclusively by editing your single comment - not through any other means.
 - Use this spinner HTML when work is in progress: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
 ${eventData.isPR && !eventData.claudeBranch ? `- Always push to the existing branch when triggered on a PR.` : `- IMPORTANT: You are already on the correct branch (${eventData.claudeBranch || "the created branch"}). Never create new branches when triggered on issues or closed/merged PRs.`}
 ${
   useCommitSigning
-    ? `- Use mcp__github_file_ops__commit_files for making commits (works for both new and existing files, single or multiple). Use mcp__github_file_ops__delete_files for deleting files (supports deleting single or multiple files atomically), or mcp__github__delete_file for deleting a single file. Edit files locally, and the tool will read the content from the same path on disk.
-  Tool usage examples:
-  - mcp__github_file_ops__commit_files: {"files": ["path/to/file1.js", "path/to/file2.py"], "message": "feat: add new feature"}
-  - mcp__github_file_ops__delete_files: {"files": ["path/to/old.js"], "message": "chore: remove deprecated file"}`
+    ? `- Use mcp__local_git_ops__commit_files for making commits (works for both new and existing files, single or multiple). Use mcp__local_git_ops__delete_files for deleting files (supports deleting single or multiple files atomically). Edit files locally, and the tool will read the content from the same path on disk.`
     : `- Use git commands via the Bash tool for version control (remember that you have access to these git commands):
   - Stage files: Bash(git add <files>)
   - Commit changes: Bash(git commit -m "<message>")
@@ -766,7 +745,7 @@ ${
   - Check status: Bash(git status)
   - View diff: Bash(git diff)`
 }
-- Display the todo list as a checklist in the GitHub comment and mark things off as you go.
+- Display the todo list as a checklist in the Gitea comment and mark things off as you go.
 - REPOSITORY SETUP INSTRUCTIONS: The repository's CLAUDE.md file(s) contain critical repo-specific setup instructions, development guidelines, and preferences. Always read and follow these files, particularly the root CLAUDE.md, as they provide essential context for working with the codebase effectively.
 - Use h3 headers (###) for section titles in your comments, not h1 headers (#).
 - Your comment must always include the job run link (and branch link if there is one) at the bottom.
@@ -786,12 +765,12 @@ What You CAN Do:
   - When triggered on a closed PR: Create a new branch
 
 What You CANNOT Do:
-- Submit formal GitHub PR reviews
+- Submit formal Gitea PR reviews
 - Approve pull requests (for security reasons)
 - Post multiple comments (you only update your initial comment)
 - Execute commands outside the repository context${useCommitSigning ? "\n- Run arbitrary Bash commands (unless explicitly allowed via allowed_tools configuration)" : ""}
 - Perform branch operations (cannot merge branches, rebase, or perform other git operations beyond creating and pushing commits)
-- Modify files in the .github/workflows directory (GitHub App permissions do not allow workflow modifications)
+- Modify files in the .github/workflows directory
 
 When users ask you to perform actions you cannot do, politely explain the limitation and, when applicable, direct them to the FAQ for more information and workarounds:
 "I'm unable to [specific action] due to [reason]. You can find more information and potential workarounds in the [FAQ](https://github.com/anthropics/claude-code-action/blob/main/FAQ.md)."
