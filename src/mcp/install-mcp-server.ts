@@ -13,6 +13,7 @@ type PrepareConfigParams = {
   claudeCommentId?: string;
   allowedTools: string[];
   context: ParsedGitHubContext;
+  giteaApiUrl?: string;
 };
 
 async function checkActionsReadPermission(
@@ -60,6 +61,7 @@ export async function prepareMcpConfig(
     claudeCommentId,
     allowedTools,
     context,
+    giteaApiUrl,
   } = params;
   try {
     const allowedToolsList = allowedTools || [];
@@ -73,21 +75,61 @@ export async function prepareMcpConfig(
     };
 
     // Always include comment server for updating Claude comments
-    baseMcpConfig.mcpServers.github_comment = {
-      command: "bun",
-      args: [
-        "run",
-        `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-comment-server.ts`,
-      ],
-      env: {
-        GITHUB_TOKEN: githubToken,
-        REPO_OWNER: owner,
-        REPO_NAME: repo,
-        ...(claudeCommentId && { CLAUDE_COMMENT_ID: claudeCommentId }),
-        GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
-        GITHUB_API_URL: GITHUB_API_URL,
-      },
-    };
+    if (giteaApiUrl) {
+      // Use Gitea MCP server when Gitea API URL is provided
+      baseMcpConfig.mcpServers.gitea_api = {
+        command: "bun",
+        args: [
+          "run",
+          `${process.env.GITHUB_ACTION_PATH}/src/mcp/gitea-mcp-server.ts`,
+        ],
+        env: {
+          GITHUB_TOKEN: githubToken,
+          REPO_OWNER: owner,
+          REPO_NAME: repo,
+          BRANCH_NAME: branch,
+          ...(claudeCommentId && { CLAUDE_COMMENT_ID: claudeCommentId }),
+          GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
+          GITEA_API_URL: giteaApiUrl,
+        },
+      };
+
+      // Add local git operations server for better file handling with Gitea
+      baseMcpConfig.mcpServers.local_git_ops = {
+        command: "bun",
+        args: [
+          "run",
+          `${process.env.GITHUB_ACTION_PATH}/src/mcp/local-git-ops-server.ts`,
+        ],
+        env: {
+          GITHUB_TOKEN: githubToken,
+          REPO_OWNER: owner,
+          REPO_NAME: repo,
+          BRANCH_NAME: branch,
+          REPO_DIR: process.env.GITHUB_WORKSPACE || process.cwd(),
+          CLAUDE_GIT_NAME: process.env.CLAUDE_GIT_NAME || "Claude",
+          CLAUDE_GIT_EMAIL: process.env.CLAUDE_GIT_EMAIL || "claude@anthropic.com",
+          GITEA_API_URL: giteaApiUrl,
+        },
+      };
+    } else {
+      // Use GitHub comment server for standard GitHub
+      baseMcpConfig.mcpServers.github_comment = {
+        command: "bun",
+        args: [
+          "run",
+          `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-comment-server.ts`,
+        ],
+        env: {
+          GITHUB_TOKEN: githubToken,
+          REPO_OWNER: owner,
+          REPO_NAME: repo,
+          ...(claudeCommentId && { CLAUDE_COMMENT_ID: claudeCommentId }),
+          GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME || "",
+          GITHUB_API_URL: GITHUB_API_URL,
+        },
+      };
+    }
 
     // Include file ops server when commit signing is enabled
     if (context.inputs.useCommitSigning) {

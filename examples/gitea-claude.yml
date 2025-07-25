@@ -1,0 +1,41 @@
+name: Claude on Gitea
+on:
+  issues:
+    types: [opened, edited, assigned]
+  issue_comment:
+    types: [created, edited]
+  pull_request:
+    types: [opened, edited, synchronize, assigned]
+  pull_request_review_comment:
+    types: [created, edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Claude Code Action
+        uses: ./  # or use the path to your merged action
+        with:
+          # Gitea-specific configuration
+          gitea_token: ${{ secrets.GITEA_TOKEN }}
+          gitea_api_url: ${{ vars.GITEA_API_URL }}     # e.g., "https://gitea.example.com/api/v1"
+          gitea_server_url: ${{ vars.GITEA_SERVER_URL }}  # e.g., "https://gitea.example.com" (for links)
+          
+          # Standard configuration
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: "claude-3-5-sonnet-20241022"
+          trigger_phrase: "@claude"
+          
+          # Optional: Custom instructions for Gitea
+          custom_instructions: |
+            You are working with a Gitea repository. 
+            Please note that some GitHub-specific features may not be available.
+            Focus on code analysis, file operations, and basic repository interactions.

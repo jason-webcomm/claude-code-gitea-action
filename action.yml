@@ -85,6 +85,15 @@ inputs:
   github_token:
     description: "GitHub token with repo and pull request permissions (optional if using GitHub App)"
     required: false
+  gitea_token:
+    description: "Gitea token with repo and pull request permissions (alternative to github_token for Gitea instances)"
+    required: false
+  gitea_api_url:
+    description: "Gitea API URL (e.g., https://gitea.example.com/api/v1) - required when using Gitea"
+    required: false
+  gitea_server_url:
+    description: "Gitea server URL (e.g., https://gitea.example.com) - used for generating links in Gitea instances"
+    required: false
   use_bedrock:
     description: "Use Amazon Bedrock with OIDC authentication instead of direct Anthropic API"
     required: false
@@ -156,6 +165,9 @@ runs:
         OVERRIDE_PROMPT: ${{ inputs.override_prompt }}
         MCP_CONFIG: ${{ inputs.mcp_config }}
         OVERRIDE_GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITEA_TOKEN: ${{ inputs.gitea_token }}
+        GITEA_API_URL: ${{ inputs.gitea_api_url }}
+        GITEA_SERVER_URL: ${{ inputs.gitea_server_url }}
         GITHUB_RUN_ID: ${{ github.run_id }}
         USE_STICKY_COMMENT: ${{ inputs.use_sticky_comment }}
         ACTIONS_TOKEN: ${{ github.token }}

@@ -4,6 +4,8 @@
 
 A general-purpose [Claude Code](https://claude.ai/code) action for GitHub PRs and issues that can answer questions and implement code changes. This action listens for a trigger phrase in comments and activates Claude act on the request. It supports multiple authentication methods including Anthropic direct API, Amazon Bedrock, and Google Vertex AI.
 
+**✨ Now with Gitea Support!** This action can also work with Gitea instances, providing the same Claude Code functionality for self-hosted Git platforms.
+
 ## Features
 
 - 🤖 **Interactive Code Assistant**: Claude can answer questions about code, architecture, and programming
@@ -769,6 +771,49 @@ For a complete list of available settings and their descriptions, see the [Claud
 - If both the `model` input parameter and a `model` in settings are provided, the `model` input parameter takes precedence.
 - The `allowed_tools` and `disallowed_tools` input parameters take precedence over `permissions` in settings.
 - In a future version, we may deprecate individual input parameters in favor of using the settings file for all configuration.
+
+## Gitea Support
+
+This action now supports Gitea instances in addition to GitHub! You can use all the same Claude Code functionality with your self-hosted Gitea repositories.
+
+### Gitea Setup
+
+1. **Generate a Gitea Access Token**:
+   - Go to your Gitea instance → Settings → Applications → Access Tokens
+   - Create a new token with repository permissions (issues, pull requests, contents)
+   - Save the token securely
+
+2. **Add Repository Secrets**:
+   - `GITEA_TOKEN`: Your Gitea access token
+   - `ANTHROPIC_API_KEY`: Your Anthropic API key (or use other auth methods)
+
+3. **Configure Repository Variables**:
+   - `GITEA_API_URL`: Your Gitea API URL (e.g., `https://gitea.example.com/api/v1`)
+   - `GITEA_SERVER_URL`: Your Gitea server URL for links (e.g., `https://gitea.example.com`)
+
+4. **Use the Gitea Example Workflow**:
+   Copy [`examples/gitea-claude.yml`](./examples/gitea-claude.yml) to your `.github/workflows/` directory.
+
+### Gitea Configuration Example
+
+```yaml
+- uses: anthropics/claude-code-action@beta
+  with:
+    gitea_token: ${{ secrets.GITEA_TOKEN }}
+    gitea_api_url: ${{ vars.GITEA_API_URL }}
+    gitea_server_url: ${{ vars.GITEA_SERVER_URL }}
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    trigger_phrase: "@claude"
+```
+
+### Gitea Limitations
+
+When using with Gitea, some GitHub-specific features may not be available:
+- GitHub Apps integration (use access tokens instead)
+- Some advanced GitHub API features
+- GitHub Actions-specific MCP tools
+
+The core functionality (code analysis, file operations, PR/issue interactions) works the same!
 
 ## Cloud Providers
 

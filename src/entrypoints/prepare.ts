@@ -108,6 +108,7 @@ async function run() {
       claudeCommentId: commentId?.toString() || "",
       allowedTools: context.inputs.allowedTools,
       context,
+      giteaApiUrl: process.env.GITEA_API_URL,
     });
     core.setOutput("mcp_config", mcpConfig);
   } catch (error) {

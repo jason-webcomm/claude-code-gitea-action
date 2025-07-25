@@ -54,6 +54,14 @@ async function exchangeForAppToken(oidcToken: string): Promise<string> {
 
 export async function setupGitHubToken(): Promise<string> {
   try {
+    // Check if Gitea token was provided (takes precedence for Gitea instances)
+    const giteaToken = process.env.GITEA_TOKEN;
+    if (giteaToken) {
+      console.log("Using provided GITEA_TOKEN for authentication");
+      core.setOutput("GITHUB_TOKEN", giteaToken);
+      return giteaToken;
+    }
+
     // Check if GitHub token was provided as override
     const providedToken = process.env.OVERRIDE_GITHUB_TOKEN;
 

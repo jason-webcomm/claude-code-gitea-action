@@ -1,12 +1,30 @@
 import fs from "fs/promises";
 import path from "path";
 import type { Octokits } from "../api/client";
-import { GITHUB_SERVER_URL } from "../api/config";
+import { getServerUrl, isGiteaInstance } from "../api/config";
 
-const IMAGE_REGEX = new RegExp(
-  `!\\[[^\\]]*\\]\\((${GITHUB_SERVER_URL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\/user-attachments\\/assets\\/[^)]+)\\)`,
-  "g",
-);
+// Create image regex based on the current platform
+function createImageRegex(): RegExp {
+  const serverUrl = getServerUrl();
+  
+  // For Gitea, we might not have the same user-attachments structure
+  // This is a placeholder that can be adjusted based on Gitea's image handling
+  if (isGiteaInstance()) {
+    // Gitea might use different paths for attachments
+    return new RegExp(
+      `!\\[[^\\]]*\\]\\((${serverUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\/attachments\\/[^)]+)\\)`,
+      "g",
+    );
+  }
+  
+  // GitHub format
+  return new RegExp(
+    `!\\[[^\\]]*\\]\\((${serverUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\/user-attachments\\/assets\\/[^)]+)\\)`,
+    "g",
+  );
+}
+
+const IMAGE_REGEX = createImageRegex();
 
 type IssueComment = {
   type: "issue_comment";

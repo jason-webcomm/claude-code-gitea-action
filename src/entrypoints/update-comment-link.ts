@@ -10,7 +10,7 @@ import {
   parseGitHubContext,
   isPullRequestReviewCommentEvent,
 } from "../github/context";
-import { GITHUB_SERVER_URL } from "../github/api/config";
+import { getServerUrl } from "../github/api/config";
 import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanup";
 import { updateClaudeComment } from "../github/operations/comments/update-claude-comment";
 
@@ -26,7 +26,7 @@ async function run() {
     const { owner, repo } = context.repository;
     const octokit = createOctokit(githubToken);
 
-    const serverUrl = GITHUB_SERVER_URL;
+    const serverUrl = getServerUrl();
     const jobUrl = `${serverUrl}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
 
     let comment;
