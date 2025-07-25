@@ -64,14 +64,25 @@ export async function createInitialComment(
         });
       }
     } else if (isPullRequestReviewCommentEvent(context)) {
-      // Only use createReplyForReviewComment if it's a PR review comment AND we have a comment_id
-      response = await octokit.rest.pulls.createReplyForReviewComment({
-        owner,
-        repo,
-        pull_number: context.entityNumber,
-        comment_id: context.payload.comment.id,
-        body: initialBody,
-      });
+      // Try createReplyForReviewComment, fall back to regular comment for Gitea
+      try {
+        response = await octokit.rest.pulls.createReplyForReviewComment({
+          owner,
+          repo,
+          pull_number: context.entityNumber,
+          comment_id: context.payload.comment.id,
+          body: initialBody,
+        });
+      } catch (error) {
+        console.warn("Review comments not supported, falling back to issue comment:", error);
+        // Fall back to regular issue comment for Gitea compatibility
+        response = await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: context.entityNumber,
+          body: initialBody,
+        });
+      }
     } else {
       // For all other cases (issues, issue comments, or missing comment_id)
       response = await octokit.rest.issues.createComment({

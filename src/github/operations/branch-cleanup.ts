@@ -41,15 +41,19 @@ export async function checkAndCommitOrDeleteBranch(
 
     // Check if Claude made any commits to the branch
     try {
-      const { data: comparison } =
-        await octokit.rest.repos.compareCommitsWithBasehead({
-          owner,
-          repo,
-          basehead: `${baseBranch}...${claudeBranch}`,
-        });
+      // Since Gitea doesn't have compareCommitsWithBasehead, use branch commit info
+      const [baseBranchInfo, claudeBranchInfo] = await Promise.all([
+        octokit.rest.repos.getBranch({ owner, repo, branch: baseBranch }),
+        octokit.rest.repos.getBranch({ owner, repo, branch: claudeBranch }),
+      ]);
+
+      // Compare commit SHAs to see if there are any differences
+      const baseSHA = baseBranchInfo.data.commit.sha;
+      const claudeSHA = claudeBranchInfo.data.commit.sha;
+      const hasCommits = baseSHA !== claudeSHA;
 
       // If there are no commits, check for uncommitted changes if not using commit signing
-      if (comparison.total_commits === 0) {
+      if (!hasCommits) {
         if (!useCommitSigning) {
           console.log(
             `Branch ${claudeBranch} has no commits from Claude, checking for uncommitted changes...`,
@@ -116,10 +120,11 @@ export async function checkAndCommitOrDeleteBranch(
   // Delete the branch if it has no commits
   if (shouldDeleteBranch && claudeBranch) {
     try {
-      await octokit.rest.git.deleteRef({
+      // Use repos.deleteBranch for branch deletion (compatible with both GitHub and Gitea)
+      await octokit.rest.repos.deleteBranch({
         owner,
         repo,
-        ref: `heads/${claudeBranch}`,
+        branch: claudeBranch,
       });
       console.log(`✅ Deleted empty branch: ${claudeBranch}`);
     } catch (deleteError) {

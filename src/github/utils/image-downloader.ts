@@ -116,28 +116,40 @@ export async function downloadCommentImages(
           break;
         }
         case "review_comment": {
-          const response = await octokits.rest.pulls.getReviewComment({
-            owner,
-            repo,
-            comment_id: parseInt(comment.id),
-            mediaType: {
-              format: "full+json",
-            },
-          });
-          bodyHtml = response.data.body_html;
+          try {
+            const response = await octokits.rest.pulls.getReviewComment({
+              owner,
+              repo,
+              comment_id: parseInt(comment.id),
+              mediaType: {
+                format: "full+json",
+              },
+            });
+            bodyHtml = response.data.body_html;
+          } catch (error) {
+            console.warn("Review comments not supported, using markdown body:", error);
+            // Fall back to markdown for Gitea compatibility
+            bodyHtml = undefined;
+          }
           break;
         }
         case "review_body": {
-          const response = await octokits.rest.pulls.getReview({
-            owner,
-            repo,
-            pull_number: parseInt(comment.pullNumber),
-            review_id: parseInt(comment.id),
-            mediaType: {
-              format: "full+json",
-            },
-          });
-          bodyHtml = response.data.body_html;
+          try {
+            const response = await octokits.rest.pulls.getReview({
+              owner,
+              repo,
+              pull_number: parseInt(comment.pullNumber),
+              review_id: parseInt(comment.id),
+              mediaType: {
+                format: "full+json",
+              },
+            });
+            bodyHtml = response.data.body_html;
+          } catch (error) {
+            console.warn("Review bodies not supported, using markdown body:", error);
+            // Fall back to markdown for Gitea compatibility
+            bodyHtml = undefined;
+          }
           break;
         }
         case "issue_body": {

@@ -113,18 +113,18 @@ async function run() {
       if (!containsPRUrl) {
         // Check if there are changes to the branch compared to the default branch
         try {
-          const { data: comparison } =
-            await octokit.rest.repos.compareCommitsWithBasehead({
-              owner,
-              repo,
-              basehead: `${baseBranch}...${claudeBranch}`,
-            });
+          // Since Gitea doesn't have compareCommitsWithBasehead, compare branch SHAs
+          const [baseBranchInfo, claudeBranchInfo] = await Promise.all([
+            octokit.rest.repos.getBranch({ owner, repo, branch: baseBranch }),
+            octokit.rest.repos.getBranch({ owner, repo, branch: claudeBranch }),
+          ]);
 
-          // If there are changes (commits or file changes), add the PR URL
-          if (
-            comparison.total_commits > 0 ||
-            (comparison.files && comparison.files.length > 0)
-          ) {
+          const baseSHA = baseBranchInfo.data.commit.sha;
+          const claudeSHA = claudeBranchInfo.data.commit.sha;
+          const hasChanges = baseSHA !== claudeSHA;
+
+          // If there are changes, add the PR URL
+          if (hasChanges) {
             const entityType = context.isPR ? "PR" : "Issue";
             const prTitle = encodeURIComponent(
               `${entityType} #${context.entityNumber}: Changes from Claude`,

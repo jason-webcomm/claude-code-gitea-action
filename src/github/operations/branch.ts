@@ -100,14 +100,14 @@ export async function setupBranch(
   const newBranch = branchName.toLowerCase().substring(0, 50);
 
   try {
-    // Get the SHA of the source branch to verify it exists
-    const sourceBranchRef = await octokits.rest.git.getRef({
+    // Get the source branch info using branches API (compatible with both GitHub and Gitea)
+    const sourceBranchRef = await octokits.rest.repos.getBranch({
       owner,
       repo,
-      ref: `heads/${sourceBranch}`,
+      branch: sourceBranch,
     });
 
-    const currentSHA = sourceBranchRef.data.object.sha;
+    const currentSHA = sourceBranchRef.data.commit.sha;
     console.log(`Source branch SHA: ${currentSHA}`);
 
     // For commit signing, defer branch creation to the file ops server
