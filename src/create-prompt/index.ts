@@ -44,6 +44,26 @@ export function buildAllowedToolsString(
   // Always include the comment update tool from the comment server
   baseTools.push("mcp__github_comment__update_claude_comment");
 
+  // Add Gitea MCP tools for Gitea instances
+  baseTools.push(
+    "mcp__gitea_api__get_issue",
+    "mcp__gitea_api__get_issue_comments",
+    "mcp__gitea_api__create_issue_comment",
+    "mcp__gitea_api__update_issue_comment",
+    "mcp__gitea_api__get_pull_request",
+    "mcp__gitea_api__get_pull_request_files",
+    "mcp__gitea_api__get_file_contents",
+    "mcp__gitea_api__list_branches",
+    // "mcp__gitea_api__create_branch",
+    // "mcp__local_git_ops__create_branch",
+    // "mcp__local_git_ops__checkout_branch",
+    // "mcp__local_git_ops__commit_files",
+    // "mcp__local_git_ops__push_branch",
+    "mcp__local_git_ops__create_pull_request",
+    // "mcp__local_git_ops__delete_files",
+    "mcp__local_git_ops__git_status"
+  );
+
   // Add commit signing tools if enabled
   if (useCommitSigning) {
     baseTools.push(
