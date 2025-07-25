@@ -72,7 +72,7 @@ export async function checkAndCommitOrDeleteBranch(
               await $`git add -A`;
 
               // Commit with a descriptive message
-              const runId = process.env.GITHUB_RUN_ID || "unknown";
+              const runId = process.env.GITHUB_RUN_NUMBER || "unknown";
               const commitMessage = `Auto-commit: Save uncommitted changes from Claude\n\nRun ID: ${runId}`;
               await $`git commit -m ${commitMessage}`;
 

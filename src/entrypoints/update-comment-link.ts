@@ -27,7 +27,7 @@ async function run() {
     const octokit = createOctokit(githubToken);
 
     const serverUrl = getServerUrl();
-    const jobUrl = `${serverUrl}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+    const jobUrl = `${serverUrl}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_NUMBER}`;
 
     let comment;
     let isPRReviewComment = false;
