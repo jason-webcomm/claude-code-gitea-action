@@ -1,14 +1,11 @@
 import { execFileSync } from "child_process";
 import type { Octokits } from "../api/client";
-import { ISSUE_QUERY, PR_QUERY, USER_QUERY } from "../api/queries/github";
 import type {
   GitHubComment,
   GitHubFile,
   GitHubIssue,
   GitHubPullRequest,
   GitHubReview,
-  IssueQueryResponse,
-  PullRequestQueryResponse,
 } from "../types";
 import type { CommentWithImages } from "../utils/image-downloader";
 import { downloadCommentImages } from "../utils/image-downloader";
@@ -53,46 +50,104 @@ export async function fetchGitHubData({
   let reviewData: { nodes: GitHubReview[] } | null = null;
 
   try {
+    // Use REST API for all requests (works with both GitHub and Gitea)
     if (isPR) {
-      // Fetch PR data with all comments and file information
-      const prResult = await octokits.graphql<PullRequestQueryResponse>(
-        PR_QUERY,
-        {
+      console.log(`Fetching PR #${prNumber} data using REST API`);
+      const prResponse = await octokits.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: parseInt(prNumber),
+      });
+
+      contextData = {
+        title: prResponse.data.title,
+        body: prResponse.data.body || "",
+        author: { login: prResponse.data.user?.login || "" },
+        baseRefName: prResponse.data.base.ref,
+        headRefName: prResponse.data.head.ref,
+        headRefOid: prResponse.data.head.sha,
+        createdAt: prResponse.data.created_at,
+        additions: prResponse.data.additions || 0,
+        deletions: prResponse.data.deletions || 0,
+        state: prResponse.data.state.toUpperCase(),
+        commits: { totalCount: 0, nodes: [] },
+        files: { nodes: [] },
+        comments: { nodes: [] },
+        reviews: { nodes: [] },
+      };
+
+      // Fetch comments separately
+      try {
+        const commentsResponse = await octokits.rest.issues.listComments({
           owner,
           repo,
-          number: parseInt(prNumber),
-        },
-      );
-
-      if (prResult.repository.pullRequest) {
-        const pullRequest = prResult.repository.pullRequest;
-        contextData = pullRequest;
-        changedFiles = pullRequest.files.nodes || [];
-        comments = pullRequest.comments?.nodes || [];
-        reviewData = pullRequest.reviews || [];
-
-        console.log(`Successfully fetched PR #${prNumber} data`);
-      } else {
-        throw new Error(`PR #${prNumber} not found`);
+          issue_number: parseInt(prNumber),
+        });
+        comments = commentsResponse.data.map((comment: any) => ({
+          id: comment.id.toString(),
+          databaseId: comment.id.toString(),
+          body: comment.body || "",
+          author: { login: comment.user?.login || "" },
+          createdAt: comment.created_at,
+        }));
+      } catch (error) {
+        console.warn("Failed to fetch PR comments:", error);
+        comments = []; // Ensure we have an empty array
       }
-    } else {
-      // Fetch issue data
-      const issueResult = await octokits.graphql<IssueQueryResponse>(
-        ISSUE_QUERY,
-        {
+
+      // Try to fetch files
+      try {
+        const filesResponse = await octokits.rest.pulls.listFiles({
           owner,
           repo,
-          number: parseInt(prNumber),
-        },
-      );
+          pull_number: parseInt(prNumber),
+        });
+        changedFiles = filesResponse.data.map((file: any) => ({
+          path: file.filename,
+          additions: file.additions || 0,
+          deletions: file.deletions || 0,
+          changeType: file.status?.toUpperCase() || "MODIFIED",
+        }));
+      } catch (error) {
+        console.warn("Failed to fetch PR files:", error);
+        changedFiles = []; // Ensure we have an empty array
+      }
 
-      if (issueResult.repository.issue) {
-        contextData = issueResult.repository.issue;
-        comments = contextData?.comments?.nodes || [];
+      reviewData = { nodes: [] }; // Simplified for Gitea compatibility
+    } else {
+      console.log(`Fetching issue #${prNumber} data using REST API`);
+      const issueResponse = await octokits.rest.issues.get({
+        owner,
+        repo,
+        issue_number: parseInt(prNumber),
+      });
 
-        console.log(`Successfully fetched issue #${prNumber} data`);
-      } else {
-        throw new Error(`Issue #${prNumber} not found`);
+      contextData = {
+        title: issueResponse.data.title,
+        body: issueResponse.data.body || "",
+        author: { login: issueResponse.data.user?.login || "" },
+        createdAt: issueResponse.data.created_at,
+        state: issueResponse.data.state.toUpperCase(),
+        comments: { nodes: [] },
+      };
+
+      // Fetch comments
+      try {
+        const commentsResponse = await octokits.rest.issues.listComments({
+          owner,
+          repo,
+          issue_number: parseInt(prNumber),
+        });
+        comments = commentsResponse.data.map((comment: any) => ({
+          id: comment.id.toString(),
+          databaseId: comment.id.toString(),
+          body: comment.body || "",
+          author: { login: comment.user?.login || "" },
+          createdAt: comment.created_at,
+        }));
+      } catch (error) {
+        console.warn("Failed to fetch issue comments:", error);
+        comments = []; // Ensure we have an empty array
       }
     }
   } catch (error) {
@@ -211,21 +266,16 @@ export async function fetchGitHubData({
   };
 }
 
-export type UserQueryResponse = {
-  user: {
-    name: string | null;
-  };
-};
 
 export async function fetchUserDisplayName(
   octokits: Octokits,
   login: string,
 ): Promise<string | null> {
   try {
-    const result = await octokits.graphql<UserQueryResponse>(USER_QUERY, {
-      login,
+    const result = await octokits.rest.users.getByUsername({
+      username: login,
     });
-    return result.user.name;
+    return result.data.name;
   } catch (error) {
     console.warn(`Failed to fetch user display name for ${login}:`, error);
     return null;
