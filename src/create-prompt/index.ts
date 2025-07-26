@@ -37,7 +37,6 @@ const DISALLOWED_TOOLS = ["WebSearch", "WebFetch"];
 export function buildAllowedToolsString(
   customAllowedTools?: string[],
   includeActionsTools: boolean = false,
-  useCommitSigning: boolean = false,
 ): string {
   let baseTools = [...BASE_ALLOWED_TOOLS];
 
@@ -47,6 +46,7 @@ export function buildAllowedToolsString(
     "mcp__gitea_api__get_issue_comments",
     "mcp__gitea_api__create_issue_comment",
     "mcp__gitea_api__update_issue_comment",
+    "mcp__gitea_api__update_claude_comment",
     "mcp__gitea_api__get_pull_request",
     "mcp__gitea_api__get_pull_request_files",
     "mcp__gitea_api__get_file_contents",
@@ -636,16 +636,14 @@ ${sanitizeContent(context.directPrompt)}
     : ""
 }
 ${`<comment_tool_info>
-IMPORTANT: You have been provided with the mcp__gitea_api__update_issue_comment tool to update your comment for this task.
+IMPORTANT: You have been provided with the mcp__gitea_api__update_claude_comment tool to update your comment for this task.
 
-Tool usage example for mcp__gitea_api__update_issue_comment:
+Tool usage example for mcp__gitea_api__update_claude_comment:
 {
-  "comment_id": ${context.claudeCommentId},
   "body": "Your comment text here"
 }
 
-Your comment ID is: ${context.claudeCommentId}
-Only the body parameter needs to be changed - always use comment_id: ${context.claudeCommentId} to update your initial comment.`}
+This tool automatically uses the Claude comment ID (${context.claudeCommentId}) that triggered this workflow.`}
 
 Your task is to analyze the context, understand the request, and provide helpful responses and/or implement code changes as needed.
 
@@ -659,7 +657,7 @@ Follow these steps:
 1. Create a Todo List:
    - Use your Gitea comment to maintain a detailed task list based on the request.
    - Format todos as a checklist (- [ ] for incomplete, - [x] for complete).
-   - Update the comment using mcp__gitea_api__update_issue_comment with each task completion.
+   - Update the comment using mcp__gitea_api__update_claude_comment with each task completion.
 
 2. Gather Context:
    - Analyze the pre-fetched data provided above.
@@ -690,11 +688,11 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
         - Look for bugs, security issues, performance problems, and other issues
         - Suggest improvements for readability and maintainability
         - Check for best practices and coding standards
-        - Reference specific code sections with file paths and line numbers${eventData.isPR ? `\n      - AFTER reading files and analyzing code, you MUST call mcp__gitea_api__update_issue_comment to post your review` : ""}
+        - Reference specific code sections with file paths and line numbers${eventData.isPR ? `\n      - AFTER reading files and analyzing code, you MUST call mcp__gitea_api__update_claude_comment to post your review` : ""}
       - Formulate a concise, technical, and helpful response based on the context.
       - Reference specific code with inline formatting or code blocks.
       - Include relevant file paths and line numbers when applicable.
-      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__gitea_api__update_issue_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the Gitea comment using mcp__gitea_api__update_issue_comment.`}
+      - ${eventData.isPR ? `IMPORTANT: Submit your review feedback by updating the Claude comment using mcp__gitea_api__update_claude_comment. This will be displayed as your PR review.` : `Remember that this feedback must be posted to the Gitea comment using mcp__gitea_api__update_claude_comment.`}
 
    B. For Straightforward Changes:
       - Use file system tools to make the change locally.
@@ -737,8 +735,8 @@ ${context.directPrompt ? `   - CRITICAL: Direct user instructions were provided 
 
 Important Notes:
 - All communication must happen through Gitea PR comments.
-- Never create new comments. Only update the existing comment using mcp__gitea_api__update_issue_comment.
-- This includes ALL responses: code reviews, answers to questions, progress updates, and final results.${eventData.isPR ? `\n- PR CRITICAL: After reading files and forming your response, you MUST post it by calling mcp__gitea_api__update_issue_comment. Do NOT just respond with a normal response, the user will not see it.` : ""}
+- Never create new comments. Only update the existing comment using mcp__gitea_api__update_claude_comment.
+- This includes ALL responses: code reviews, answers to questions, progress updates, and final results.${eventData.isPR ? `\n- PR CRITICAL: After reading files and forming your response, you MUST post it by calling mcp__gitea_api__update_claude_comment. Do NOT just respond with a normal response, the user will not see it.` : ""}
 - You communicate exclusively by editing your single comment - not through any other means.
 - Use this spinner HTML when work is in progress: <img src="https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f" width="14px" height="14px" style="vertical-align: middle; margin-left: 4px;" />
 ${eventData.isPR && !eventData.claudeBranch ? `- Always push to the existing branch when triggered on a PR.` : `- IMPORTANT: You are already on the correct branch (${eventData.claudeBranch || "the created branch"}). Never create new branches when triggered on issues or closed/merged PRs.`}
@@ -865,7 +863,6 @@ export async function createPrompt(
     const allAllowedTools = buildAllowedToolsString(
       combinedAllowedTools,
       hasActionsReadPermission,
-      context.inputs.useCommitSigning,
     );
     const allDisallowedTools = buildDisallowedToolsString(
       combinedDisallowedTools,
@@ -874,6 +871,7 @@ export async function createPrompt(
 
     core.exportVariable("ALLOWED_TOOLS", allAllowedTools);
     core.exportVariable("DISALLOWED_TOOLS", allDisallowedTools);
+    core.exportVariable("CLAUDE_COMMENT_ID", preparedContext.claudeCommentId);
   } catch (error) {
     core.setFailed(`Create prompt failed with error: ${error}`);
     process.exit(1);

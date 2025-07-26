@@ -428,6 +428,54 @@ server.tool(
   },
 );
 
+// Update Claude comment (convenience tool that uses the CLAUDE_COMMENT_ID automatically)
+server.tool(
+  "update_claude_comment",
+  "Update the Claude comment with progress and results (automatically uses the Claude comment ID)",
+  {
+    body: z.string().describe("The updated comment content"),
+  },
+  async ({ body }) => {
+    try {
+      const claudeCommentId = process.env.CLAUDE_COMMENT_ID;
+      
+      if (!claudeCommentId) {
+        throw new Error("CLAUDE_COMMENT_ID environment variable is required");
+      }
+
+      const comment_id = parseInt(claudeCommentId, 10);
+      const comment = await giteaRequest(
+        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${comment_id}`,
+        "PATCH",
+        { body },
+      );
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Claude comment updated successfully: ${JSON.stringify(comment, null, 2)}`,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`[GITEA-MCP] Error updating Claude comment: ${errorMessage}`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error updating Claude comment: ${errorMessage}`,
+          },
+        ],
+        error: errorMessage,
+        isError: true,
+      };
+    }
+  },
+);
+
 // Start the server
 const transport = new StdioServerTransport();
 server.connect(transport);
