@@ -14,6 +14,55 @@ import { getServerUrl } from "../github/api/config";
 import { checkAndCommitOrDeleteBranch } from "../github/operations/branch-cleanup";
 import { updateClaudeComment } from "../github/operations/comments/update-claude-comment";
 
+// Function to detect Claude usage limits from output data
+function detectClaudeUsageLimit(outputData: any[]): boolean {
+  if (!Array.isArray(outputData)) return false;
+  
+  return outputData.some(entry => {
+    if (typeof entry === 'object' && entry.text) {
+      const text = String(entry.text);
+      return text.includes("Claude AI usage limit reached");
+    }
+    return false;
+  });
+}
+
+// Direct API fallback for updating comments when MCP fails due to usage limits
+async function updateCommentDirectAPI(
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string,
+  isPRReviewComment: boolean
+): Promise<void> {
+  const githubToken = process.env.GITHUB_TOKEN!;
+  const giteaApiUrl = process.env.GITEA_API_URL || "https://api.github.com";
+  
+  // Use Gitea API directly (same endpoints as the MCP server)
+  const endpoint = isPRReviewComment 
+    ? `/repos/${owner}/${repo}/pulls/comments/${commentId}`
+    : `/repos/${owner}/${repo}/issues/comments/${commentId}`;
+  
+  const url = `${giteaApiUrl}${endpoint}`;
+  
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `token ${githubToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ body }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update comment via direct Gitea API: ${response.status} ${errorText}`);
+  }
+  
+  console.log(`✅ Updated comment ${commentId} via direct Gitea API (usage limit fallback)`);
+}
+
 async function run() {
   try {
     const commentId = parseInt(process.env.CLAUDE_COMMENT_ID!);
@@ -150,6 +199,7 @@ async function run() {
     } | null = null;
     let actionFailed = false;
     let errorDetails: string | undefined;
+    let claudeUsageLimitReached = false;
 
     // First check if prepare step failed
     const prepareSuccess = process.env.PREPARE_SUCCESS !== "false";
@@ -165,6 +215,15 @@ async function run() {
         if (outputFile) {
           const fileContent = await fs.readFile(outputFile, "utf8");
           const outputData = JSON.parse(fileContent);
+
+          // Check for Claude usage limits in the output data
+          claudeUsageLimitReached = detectClaudeUsageLimit(outputData);
+          
+          if (claudeUsageLimitReached) {
+            console.log("🚨 Claude Code usage limit detected - will use direct API fallback for comment update");
+            actionFailed = true;
+            errorDetails = "Claude Code usage limit reached. Please try again later.";
+          }
 
           // Output file is an array, get the last element which contains execution details
           if (Array.isArray(outputData) && outputData.length > 0) {
@@ -183,9 +242,11 @@ async function run() {
           }
         }
 
-        // Check if the Claude action failed
-        const claudeSuccess = process.env.CLAUDE_SUCCESS !== "false";
-        actionFailed = !claudeSuccess;
+        // Check if the Claude action failed (unless it's just a usage limit)
+        if (!claudeUsageLimitReached) {
+          const claudeSuccess = process.env.CLAUDE_SUCCESS !== "false";
+          actionFailed = !claudeSuccess;
+        }
       } catch (error) {
         console.error("Error reading output file:", error);
         // If we can't read the file, check for any failure markers
@@ -209,22 +270,54 @@ async function run() {
     const updatedBody = updateCommentBody(commentInput);
 
     try {
-      await updateClaudeComment(octokit.rest, {
-        owner,
-        repo,
-        commentId,
-        body: updatedBody,
-        isPullRequestReviewComment: isPRReviewComment,
-      });
-      console.log(
-        `✅ Updated ${isPRReviewComment ? "PR review" : "issue"} comment ${commentId} with job link`,
-      );
+      // Use direct API fallback if Claude usage limit was reached
+      if (claudeUsageLimitReached) {
+        console.log("Using direct API fallback due to Claude usage limit");
+        await updateCommentDirectAPI(
+          owner,
+          repo,
+          commentId,
+          updatedBody,
+          isPRReviewComment
+        );
+      } else {
+        // Use normal MCP-based update
+        await updateClaudeComment(octokit.rest, {
+          owner,
+          repo,
+          commentId,
+          body: updatedBody,
+          isPullRequestReviewComment: isPRReviewComment,
+        });
+        console.log(
+          `✅ Updated ${isPRReviewComment ? "PR review" : "issue"} comment ${commentId} with job link`,
+        );
+      }
     } catch (updateError) {
-      console.error(
-        `Failed to update ${isPRReviewComment ? "PR review" : "issue"} comment:`,
-        updateError,
-      );
-      throw updateError;
+      // If normal update fails and we haven't tried direct API yet, try it as fallback
+      if (!claudeUsageLimitReached) {
+        console.log("Normal comment update failed, trying direct API fallback...");
+        try {
+          await updateCommentDirectAPI(
+            owner,
+            repo,
+            commentId,
+            updatedBody,
+            isPRReviewComment
+          );
+        } catch (fallbackError) {
+          console.error("Both normal and fallback comment updates failed:");
+          console.error("Original error:", updateError);
+          console.error("Fallback error:", fallbackError);
+          throw updateError; // Throw the original error
+        }
+      } else {
+        console.error(
+          `Failed to update ${isPRReviewComment ? "PR review" : "issue"} comment via direct API:`,
+          updateError,
+        );
+        throw updateError;
+      }
     }
 
     process.exit(0);
