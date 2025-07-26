@@ -68,24 +68,41 @@ export async function checkAndCommitOrDeleteBranch(
             if (hasUncommittedChanges) {
               console.log("Found uncommitted changes, committing them...");
 
-              // Add all changes
+              // Add all changes but exclude output.txt (temporary file from Claude execution)
               await $`git add -A`;
+              try {
+                // Remove output.txt from staging if it exists
+                await $`git reset HEAD output.txt`.quiet();
+              } catch {
+                // Ignore if output.txt doesn't exist in staging
+              }
 
-              // Commit with a descriptive message
-              const runId = process.env.GITHUB_RUN_NUMBER || "unknown";
-              const commitMessage = `Auto-commit: Save uncommitted changes from Claude\n\nRun ID: ${runId}`;
-              await $`git commit -m ${commitMessage}`;
+              // Check if there are still staged changes after excluding output.txt
+              const stagedChanges = await $`git diff --cached --name-only`.quiet();
+              const hasStagedChanges = stagedChanges.stdout.toString().trim().length > 0;
 
-              // Push the changes
-              await $`git push origin ${claudeBranch}`;
+              if (hasStagedChanges) {
+                // Commit with a descriptive message
+                const runId = process.env.GITHUB_RUN_NUMBER || "unknown";
+                const commitMessage = `Auto-commit: Save uncommitted changes from Claude\n\nRun ID: ${runId}`;
+                await $`git commit -m ${commitMessage}`;
 
-              console.log(
-                "✅ Successfully committed and pushed uncommitted changes",
-              );
+                // Push the changes
+                await $`git push origin ${claudeBranch}`;
 
-              // Set branch link since we now have commits
-              const branchUrl = `${getServerUrl()}/${owner}/${repo}/tree/${claudeBranch}`;
-              branchLink = `\n[View branch](${branchUrl})`;
+                console.log(
+                  "✅ Successfully committed and pushed uncommitted changes",
+                );
+
+                // Set branch link since we now have commits
+                const branchUrl = `${getServerUrl()}/${owner}/${repo}/tree/${claudeBranch}`;
+                branchLink = `\n[View branch](${branchUrl})`;
+              } else {
+                console.log(
+                  "No significant changes to commit (only temporary files), marking branch for deletion",
+                );
+                shouldDeleteBranch = true;
+              }
             } else {
               console.log(
                 "No uncommitted changes found, marking branch for deletion",
