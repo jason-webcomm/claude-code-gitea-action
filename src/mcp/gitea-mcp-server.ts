@@ -78,7 +78,7 @@ server.tool(
   async ({ issue_number }) => {
     try {
       const issue = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}`,
       );
 
       return {
@@ -115,7 +115,7 @@ server.tool(
   async ({ issue_number }) => {
     try {
       const comments = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}/comments`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}/comments`,
       );
 
       return {
@@ -153,7 +153,7 @@ server.tool(
   async ({ issue_number, body }) => {
     try {
       const comment = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}/comments`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/${issue_number}/comments`,
         "POST",
         { body },
       );
@@ -193,7 +193,7 @@ server.tool(
   async ({ comment_id, body }) => {
     try {
       const comment = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${comment_id}`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${comment_id}`,
         "PATCH",
         { body },
       );
@@ -232,7 +232,7 @@ server.tool(
   async ({ pr_number }) => {
     try {
       const pr = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${pr_number}`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${pr_number}`,
       );
 
       return {
@@ -269,7 +269,7 @@ server.tool(
   async ({ pr_number }) => {
     try {
       const files = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${pr_number}/files`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${pr_number}/files`,
       );
 
       return {
@@ -306,7 +306,7 @@ server.tool(
   },
   async ({ path, ref }) => {
     try {
-      let endpoint = `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(path)}`;
+      let endpoint = `/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(path)}`;
       if (ref) {
         endpoint += `?ref=${encodeURIComponent(ref)}`;
       }
@@ -358,7 +358,7 @@ server.tool(
   async () => {
     try {
       const branches = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/branches`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/branches`,
       );
 
       return {
@@ -396,7 +396,7 @@ server.tool(
   async ({ new_branch_name, old_branch_name }) => {
     try {
       const branch = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/branches`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/branches`,
         "POST",
         {
           new_branch_name,
@@ -445,7 +445,7 @@ server.tool(
 
       const comment_id = parseInt(claudeCommentId, 10);
       const comment = await giteaRequest(
-        `/api/v1/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${comment_id}`,
+        `/repos/${REPO_OWNER}/${REPO_NAME}/issues/comments/${comment_id}`,
         "PATCH",
         { body },
       );
