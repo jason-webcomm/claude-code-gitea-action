@@ -32,7 +32,7 @@ async function run() {
     // Skip permission check if environment variable is set
     if (process.env.SKIP_PERMISSION_CHECK === "true") {
       core.info("SKIP_PERMISSION_CHECK is set, skipping permission validation");
-      return true;
+
     }else{
       const hasWritePermissions = await checkWritePermissions(
         octokit.rest,
