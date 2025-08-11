@@ -29,14 +29,20 @@ async function run() {
     const context = parseGitHubContext();
 
     // Step 3: Check write permissions
-    const hasWritePermissions = await checkWritePermissions(
-      octokit.rest,
-      context,
-    );
-    if (!hasWritePermissions) {
-      throw new Error(
-        "Actor does not have write permissions to the repository",
+    // Skip permission check if environment variable is set
+    if (process.env.SKIP_PERMISSION_CHECK === "true") {
+      core.info("SKIP_PERMISSION_CHECK is set, skipping permission validation");
+      return true;
+    }else{
+      const hasWritePermissions = await checkWritePermissions(
+        octokit.rest,
+        context,
       );
+      if (!hasWritePermissions) {
+        throw new Error(
+          "Actor does not have write permissions to the repository",
+        );
+      }
     }
 
     // Step 4: Get mode and check trigger conditions
